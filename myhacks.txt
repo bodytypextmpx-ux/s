@@ -1,0 +1,115 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local currentSize = 100
+local currentTrans = 0.5
+
+local isEnabled = false
+local originalSizes = {}
+
+local function isValidWeapon(tool)
+    return tool:IsA("Tool") and (
+        tool.Name == "Buddy Sword"
+        or tool.ToolTip == "Gun"
+    )
+end
+
+local function applyHitbox(char)
+    if not char then return end
+
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    if isEnabled then
+        if not originalSizes[root] then
+            originalSizes[root] = {
+                Size = root.Size,
+                Transparency = root.Transparency,
+                CanCollide = root.CanCollide
+            }
+        end
+
+        root.Size = Vector3.new(
+            currentSize,
+            currentSize,
+            currentSize
+        )
+
+        root.Transparency = currentTrans
+        root.CanCollide = false
+    else
+        local original = originalSizes[root]
+
+        if original then
+            root.Size = original.Size
+            root.Transparency = original.Transparency
+            root.CanCollide = original.CanCollide
+
+            originalSizes[root] = nil
+        end
+    end
+end
+
+local function reapplyToAll()
+    for _, target in ipairs(Players:GetPlayers()) do
+        if target ~= player and target.Character then
+            applyHitbox(target.Character)
+        end
+    end
+end
+
+local function checkWeapons()
+    local character = player.Character
+    if not character then return end
+
+    local equipped = false
+
+    for _, tool in ipairs(character:GetChildren()) do
+        if isValidWeapon(tool) then
+            equipped = true
+            break
+        end
+    end
+
+    if equipped ~= isEnabled then
+        isEnabled = equipped
+        reapplyToAll()
+    end
+end
+
+local function setupPlayer(target)
+    if target == player then return end
+
+    target.CharacterAdded:Connect(function(char)
+        task.wait(0.5)
+        applyHitbox(char)
+    end)
+end
+
+for _, target in ipairs(Players:GetPlayers()) do
+    setupPlayer(target)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+
+local function setupCharacter(character)
+    character.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            checkWeapons()
+        end
+    end)
+
+    character.ChildRemoved:Connect(function(child)
+        if child:IsA("Tool") then
+            checkWeapons()
+        end
+    end)
+
+    checkWeapons()
+end
+
+if player.Character then
+    setupCharacter(player.Character)
+end
+
+player.CharacterAdded:Connect(setupCharacter)
